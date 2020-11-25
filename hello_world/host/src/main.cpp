@@ -73,24 +73,58 @@ int main() {
     return -1;
   }
 
-  // Set the kernel argument (argument 0)
-  status = clSetKernelArg(kernel, 0, sizeof(cl_int), (void*)&thread_id_to_output);
+  // Set the kernel argument
+  cl_int err;
+  cl_ulong attempt = 0;
+  cl_ulong result = 0;
+  cl_uchar item[32] = {'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b'};
+  uint64_t base_max_uint64 = 0xFFFFFFFFFFFFFFFF;
+  uint64_t base_difficulty = base_max_uint64 - 0xFFFFFFC000000000;
+  cl_ulong difficult = (cl_ulong)(base_max_uint64 - (base_difficulty / 8));
+  printf("difficulty: %lu\n", difficult);
+  cl_mem arg0 = NULL;
+  cl_mem arg1 = NULL;
+  cl_mem arg2 = NULL;
+  arg0 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(attempt), (void*)&attempt, &err);
+  arg1 = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(result), (void*)&result, &err);
+  arg2 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(item), (void*)&item, &err);
+  status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&arg0);
   checkError(status, "Failed to set kernel arg 0");
+  status = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void*)&arg1);
+  checkError(status, "Failed to set kernel arg 1");
+  status = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void*)&arg2);
+  checkError(status, "Failed to set kernel arg 2");
+  status = clSetKernelArg(kernel, 3, sizeof(cl_ulong), (void*)&difficult);
+  checkError(status, "Failed to set kernel arg 3");
 
   printf("\nKernel initialization is complete.\n");
   printf("Launching the kernel...\n\n");
 
-  // Configure work set over which the kernel will execute
-  size_t wgSize[3] = {work_group_size, 1, 1};
-  size_t gSize[3] = {work_group_size, 1, 1};
+  for (;;attempt += work_group_size) {
+    printf("attempt: %ld\n", attempt);
+    arg0 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(attempt), (void*)&attempt, &err);
+    status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&arg0);
+    checkError(status, "Failed to set kernel arg 0");
+    // Configure work set over which the kernel will execute
+    size_t gSize[3] = {work_group_size, 1, 1};
 
-  // Launch the kernel
-  status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, gSize, wgSize, 0, NULL, NULL);
-  checkError(status, "Failed to launch kernel");
+    // Launch the kernel
+    status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, gSize, NULL, 0, NULL, NULL);
+    checkError(status, "Failed to launch kernel");
 
-  // Wait for command queue to complete pending events
-  status = clFinish(queue);
-  checkError(status, "Failed to finish");
+    // Get result
+    clEnqueueReadBuffer(queue, arg1, CL_TRUE, 0, sizeof(result), (void *)&result, 0, 0, 0);
+
+    // Wait for command queue to complete pending events
+    status = clFinish(queue);
+    checkError(status, "Failed to finish");
+
+    // Check validation
+    if (result != 0) {
+      printf("result: %ld\n", result);
+      break;
+    }
+  }
 
   printf("\nKernel execution is complete.\n");
 
@@ -110,7 +144,7 @@ bool init() {
   }
 
   // Get the OpenCL platform.
-  platform = findPlatform("Intel(R) FPGA SDK for OpenCL(TM)");
+  platform = findPlatform("Intel(R) OpenCL HD Graphics");
   if(platform == NULL) {
     printf("ERROR: Unable to find Intel(R) FPGA OpenCL platform.\n");
     return false;
@@ -133,6 +167,9 @@ bool init() {
   scoped_array<cl_device_id> devices;
   cl_uint num_devices;
 
+  status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, NULL, &num_devices);
+  checkError(status, "Failed to get device ID");
+  printf("device num: %d\n", num_devices);
   devices.reset(getDevices(platform, CL_DEVICE_TYPE_ALL, &num_devices));
 
   // We'll just use the first device.
@@ -150,9 +187,15 @@ bool init() {
   checkError(status, "Failed to create command queue");
 
   // Create the program.
-  std::string binary_file = getBoardBinaryFile("hello_world", device);
-  printf("Using AOCX: %s\n", binary_file.c_str());
-  program = createProgramFromBinary(context, binary_file.c_str(), &device, 1);
+  //std::string binary_file = getBoardBinaryFile("nano_work", device);
+  //printf("Using AOCX: %s\n", binary_file.c_str());
+  //program = createProgramFromBinary(context, binary_file.c_str(), &device, 1);
+  size_t file_size;
+  unsigned char *source = loadBinaryFile("../device/nano_work.cl", &file_size);
+  if (source == NULL)
+    printf("No source file, pointer is NULL\n");
+  program = clCreateProgramWithSource(context, 1, (const char**)&source, &file_size, &status);
+  checkError(status, "Failed to create program with source");
 
   // Build the program that was just created.
   status = clBuildProgram(program, 0, NULL, "", NULL, NULL);
@@ -160,7 +203,7 @@ bool init() {
 
   // Create the kernel - name passed in here must match kernel name in the
   // original CL file, that was compiled into an AOCX file using the AOC tool
-  const char *kernel_name = "hello_world";  // Kernel name, as defined in the CL file
+  const char *kernel_name = "nano_work";  // Kernel name, as defined in the CL file
   kernel = clCreateKernel(program, kernel_name, &status);
   checkError(status, "Failed to create kernel");
 
