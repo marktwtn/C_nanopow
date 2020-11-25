@@ -40,18 +40,18 @@ $(error Set INTELFPGAOCLSDKROOT to the root directory of the Intel(R) FPGA SDK f
 endif
 
 # OpenCL compile and link flags.
-#AOCL_COMPILE_CONFIG := $(shell aocl compile-config )
-#AOCL_LINK_CONFIG := $(shell aocl link-config )
+AOCL_COMPILE_CONFIG := $(shell aocl compile-config )
+AOCL_LINK_CONFIG := $(wildcard $(INTELFPGAOCLSDKROOT)/host/arm32/lib/*.so) $(wildcard $(AOCL_BOARD_PACKAGE_ROOT)/arm32/lib/*.so)
 
 # Compilation flags
 ifeq ($(DEBUG),1)
 CXXFLAGS += -g
 else
-CXXFLAGS += -O2
+CXXFLAGS += -O2 -DARM -DLINUX
 endif
 
 # Compiler
-CXX := g++
+CXX := arm-linux-gnueabihf-g++
 
 # Target
 TARGET := host
@@ -64,7 +64,7 @@ LIB_DIRS :=
 # Files
 INCS := $(wildcard )
 SRCS := $(wildcard host/src/*.cpp ../common/src/AOCLUtils/*.cpp)
-LIBS := rt pthread OpenCL
+LIBS := rt pthread
 
 # Make it all!
 all : $(TARGET_DIR)/$(TARGET)

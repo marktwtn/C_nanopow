@@ -43,7 +43,7 @@ using namespace aocl_utils;
 
 // Runtime constants
 // Used to define the work set over which this kernel will execute.
-static const size_t work_group_size = 8;  // 8 threads in the demo workgroup
+static const size_t work_group_size = 1<<23;  // 1<<23 threads in the demo workgroup
 // Defines kernel argument value, which is the workitem ID that will
 // execute a printf call
 static const int thread_id_to_output = 2;
@@ -81,15 +81,12 @@ int main() {
   uint64_t base_max_uint64 = 0xFFFFFFFFFFFFFFFF;
   uint64_t base_difficulty = base_max_uint64 - 0xFFFFFFC000000000;
   cl_ulong difficult = (cl_ulong)(base_max_uint64 - (base_difficulty / 8));
-  printf("difficulty: %lu\n", difficult);
+  printf("difficulty: %llu\n", difficult);
   cl_mem arg0 = NULL;
   cl_mem arg1 = NULL;
   cl_mem arg2 = NULL;
-  arg0 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(attempt), (void*)&attempt, &err);
   arg1 = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(result), (void*)&result, &err);
-  arg2 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(item), (void*)&item, &err);
-  status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&arg0);
-  checkError(status, "Failed to set kernel arg 0");
+  arg2 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(item), (void*)&item, &err);
   status = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void*)&arg1);
   checkError(status, "Failed to set kernel arg 1");
   status = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void*)&arg2);
@@ -101,8 +98,8 @@ int main() {
   printf("Launching the kernel...\n\n");
 
   for (;;attempt += work_group_size) {
-    printf("attempt: %ld\n", attempt);
-    arg0 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(attempt), (void*)&attempt, &err);
+    printf("host attempt: %llu\n", attempt);
+    arg0 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(attempt), (void*)&attempt, &err);
     status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&arg0);
     checkError(status, "Failed to set kernel arg 0");
     // Configure work set over which the kernel will execute
@@ -114,14 +111,19 @@ int main() {
 
     // Get result
     clEnqueueReadBuffer(queue, arg1, CL_TRUE, 0, sizeof(result), (void *)&result, 0, 0, 0);
+    printf("Host result: %llu\n", result);
 
     // Wait for command queue to complete pending events
     status = clFinish(queue);
     checkError(status, "Failed to finish");
 
+    // Release resource
+    clReleaseMemObject(arg0);
+
     // Check validation
     if (result != 0) {
-      printf("result: %ld\n", result);
+      printf("result: %llu\n", result);
+      printf("Found result.\n");
       break;
     }
   }
@@ -144,7 +146,7 @@ bool init() {
   }
 
   // Get the OpenCL platform.
-  platform = findPlatform("Intel(R) OpenCL HD Graphics");
+  platform = findPlatform("Intel(R) FPGA SDK for OpenCL(TM)");
   if(platform == NULL) {
     printf("ERROR: Unable to find Intel(R) FPGA OpenCL platform.\n");
     return false;
@@ -187,15 +189,15 @@ bool init() {
   checkError(status, "Failed to create command queue");
 
   // Create the program.
-  //std::string binary_file = getBoardBinaryFile("nano_work", device);
-  //printf("Using AOCX: %s\n", binary_file.c_str());
-  //program = createProgramFromBinary(context, binary_file.c_str(), &device, 1);
-  size_t file_size;
-  unsigned char *source = loadBinaryFile("../device/nano_work.cl", &file_size);
-  if (source == NULL)
-    printf("No source file, pointer is NULL\n");
-  program = clCreateProgramWithSource(context, 1, (const char**)&source, &file_size, &status);
-  checkError(status, "Failed to create program with source");
+  std::string binary_file = getBoardBinaryFile("nano_work", device);
+  printf("Using AOCX: %s\n", binary_file.c_str());
+  program = createProgramFromBinary(context, binary_file.c_str(), &device, 1);
+  //size_t file_size;
+  //unsigned char *source = loadBinaryFile("../device/nano_work.cl", &file_size);
+  //if (source == NULL)
+  //  printf("No source file, pointer is NULL\n");
+  //program = clCreateProgramWithSource(context, 1, (const char**)&source, &file_size, &status);
+  //checkError(status, "Failed to create program with source");
 
   // Build the program that was just created.
   status = clBuildProgram(program, 0, NULL, "", NULL, NULL);

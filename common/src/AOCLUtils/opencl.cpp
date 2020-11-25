@@ -406,7 +406,7 @@ unsigned char *loadBinaryFile(const char *file_name, size_t *size) {
     return NULL;
   }
 #else
-  fp = fopen(file_name, "r");
+  fp = fopen(file_name, "rb");
   if(fp == 0) {
     return NULL;
   }
@@ -443,7 +443,7 @@ bool fileExists(const char *file_name) {
 
 std::string getBoardBinaryFile(const char *prefix, cl_device_id device) {
   // First check if <prefix>.aocx exists. Use it if it does.
-  std::string file_name = std::string(prefix) + ".cl";
+  std::string file_name = std::string(prefix) + ".aocx";
   if(fileExists(file_name.c_str())) {
     return file_name;
   }

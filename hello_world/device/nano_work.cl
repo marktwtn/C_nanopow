@@ -126,12 +126,12 @@ static inline ulong blake2b(ulong const nonce, __constant ulong *h)
 #undef G2v_split
 #undef ROUND
 
-__kernel void nano_work(__constant ulong *attempt,
-                        __global ulong *result_a,
+__kernel void nano_work(__constant unsigned long long *attempt,
+                        __global unsigned long long *result_a,
                         __constant uchar *item_a,
-                        const ulong difficulty)
+                        const unsigned long long difficulty)
 {
-    const ulong attempt_l = *attempt + get_global_id(0);
+    const unsigned long long attempt_l = *attempt + get_global_id(0);
     if (blake2b(attempt_l, (__constant ulong *)item_a) >= difficulty) {
         *result_a = attempt_l;
     }
