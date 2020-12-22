@@ -81,7 +81,6 @@ int main() {
   uint64_t base_max_uint64 = 0xFFFFFFFFFFFFFFFF;
   uint64_t base_difficulty = base_max_uint64 - 0xFFFFFFC000000000;
   cl_ulong difficult = (cl_ulong)(base_max_uint64 - (base_difficulty / 8));
-  printf("difficulty: %llu\n", difficult);
   cl_mem arg0 = NULL;
   cl_mem arg1 = NULL;
   cl_mem arg2 = NULL;
@@ -94,11 +93,11 @@ int main() {
   status = clSetKernelArg(kernel, 3, sizeof(cl_ulong), (void*)&difficult);
   checkError(status, "Failed to set kernel arg 3");
 
+  printf("Difficulty: %llu\n", difficult);
   printf("\nKernel initialization is complete.\n");
   printf("Launching the kernel...\n\n");
 
   for (;;attempt += work_group_size) {
-    printf("host attempt: %llu\n", attempt);
     arg0 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(attempt), (void*)&attempt, &err);
     status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&arg0);
     checkError(status, "Failed to set kernel arg 0");
@@ -111,7 +110,6 @@ int main() {
 
     // Get result
     clEnqueueReadBuffer(queue, arg1, CL_TRUE, 0, sizeof(result), (void *)&result, 0, 0, 0);
-    printf("Host result: %llu\n", result);
 
     // Wait for command queue to complete pending events
     status = clFinish(queue);
@@ -122,12 +120,11 @@ int main() {
 
     // Check validation
     if (result != 0) {
-      printf("result: %llu\n", result);
-      printf("Found result.\n");
       break;
     }
   }
 
+  printf("Found result: %llu\n", result);
   printf("\nKernel execution is complete.\n");
 
   // Free the resources allocated
