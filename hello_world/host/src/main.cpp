@@ -66,7 +66,7 @@ static void device_info_string( cl_device_id device, cl_device_info param, const
 static void display_device_info( cl_device_id device );
 
 // Entry point.
-int main() {
+int main(int argc, char *argv[]) {
   cl_int status;
 
   if(!init()) {
@@ -77,7 +77,8 @@ int main() {
   cl_int err;
   cl_ulong attempt = 0;
   cl_ulong result = 0;
-  cl_uchar item[32] = {'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b'};
+  cl_uchar item[32];
+  memcpy(item, argv[1], 32);
   uint64_t base_max_uint64 = 0xFFFFFFFFFFFFFFFF;
   uint64_t base_difficulty = base_max_uint64 - 0xFFFFFFC000000000;
   cl_ulong difficult = (cl_ulong)(base_max_uint64 - (base_difficulty / 8));
