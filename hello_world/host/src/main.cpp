@@ -82,7 +82,6 @@ int main(int argc, char *argv[]) {
   uint64_t base_max_uint64 = 0xFFFFFFFFFFFFFFFF;
   uint64_t base_difficulty = base_max_uint64 - 0xFFFFFFC000000000;
   cl_ulong difficult = (cl_ulong)(base_max_uint64 - (base_difficulty / 8));
-  cl_mem arg0 = NULL;
   cl_mem arg1 = NULL;
   cl_mem arg2 = NULL;
   arg1 = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(result), (void*)&result, &err);
@@ -99,8 +98,7 @@ int main(int argc, char *argv[]) {
   printf("Launching the kernel...\n\n");
 
   for (;;attempt += work_group_size) {
-    arg0 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(attempt), (void*)&attempt, &err);
-    status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&arg0);
+    status = clSetKernelArg(kernel, 0, sizeof(cl_ulong), (void*)&attempt);
     checkError(status, "Failed to set kernel arg 0");
     // Configure work set over which the kernel will execute
     size_t gSize[3] = {work_group_size, 1, 1};
@@ -115,9 +113,6 @@ int main(int argc, char *argv[]) {
     // Wait for command queue to complete pending events
     status = clFinish(queue);
     checkError(status, "Failed to finish");
-
-    // Release resource
-    clReleaseMemObject(arg0);
 
     // Check validation
     if (result != 0) {
