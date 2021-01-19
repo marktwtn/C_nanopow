@@ -126,6 +126,7 @@ static inline ulong blake2b(ulong const nonce, __constant ulong *h)
 #undef G2v_split
 #undef ROUND
 
+__attribute__((num_compute_units(3)))
 __kernel void nano_work(const ulong attempt,
                         __global ulong *result_a,
                         __constant uchar *item_a,
